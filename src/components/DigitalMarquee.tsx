@@ -69,17 +69,17 @@ const DigitalMarquee: React.FC<DigitalMarqueeProps> = ({
           font-weight: bold;
           text-transform: uppercase;
           letter-spacing: 2px;
-          animation: scrollLeftToRight 15s linear infinite;
+          animation: scrollRightToLeft 25s linear infinite;
           position: absolute;
           text-shadow: 0 0 5px #0f0;
         }
 
-        @keyframes scrollLeftToRight {
+        @keyframes scrollRightToLeft {
           0% {
-            transform: translateX(-100%);
+            transform: translateX(100vw);
           }
           100% {
-            transform: translateX(100vw);
+            transform: translateX(-100%);
           }
         }
       `}</style>
