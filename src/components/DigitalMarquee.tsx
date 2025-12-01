@@ -1,4 +1,6 @@
 import React from 'react';
+import { ref, onValue } from 'firebase/database';
+import { db } from '../firebase';
 
 interface DigitalMarqueeProps {
   message?: string;
@@ -10,30 +12,16 @@ const DigitalMarquee: React.FC<DigitalMarqueeProps> = ({
   const [text, setText] = React.useState(initialMessage);
 
   React.useEffect(() => {
-    // Check for saved message on mount
-    const saved = localStorage.getItem('marquee_message');
-    if (saved) setText(saved);
+    const messageRef = ref(db, 'marquee/message');
 
-    // Listen for changes from other tabs (Admin Console)
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'marquee_message' && e.newValue) {
-        setText(e.newValue);
+    const unsubscribe = onValue(messageRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setText(data);
       }
-    };
+    });
 
-    // Listen for changes within the same tab (if needed)
-    const handleCustom = () => {
-      const saved = localStorage.getItem('marquee_message');
-      if (saved) setText(saved);
-    };
-
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('marquee-update', handleCustom);
-
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('marquee-update', handleCustom);
-    };
+    return () => unsubscribe();
   }, []);
 
   return (

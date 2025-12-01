@@ -1,22 +1,26 @@
 import React, { useState } from 'react';
+import { ref, set } from 'firebase/database';
+import { db } from '../firebase';
 
 const AdminConsole: React.FC = () => {
     const [input, setInput] = useState('');
     const [status, setStatus] = useState('READY');
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim()) return;
 
-        // Save to localStorage
-        localStorage.setItem('marquee_message', input);
+        try {
+            // Save to Firebase Realtime Database
+            await set(ref(db, 'marquee/message'), input);
 
-        // Dispatch event for same-tab updates
-        window.dispatchEvent(new Event('marquee-update'));
-
-        setStatus('BROADCAST_SENT');
-        setInput('');
-        setTimeout(() => setStatus('READY'), 2000);
+            setStatus('BROADCAST_SENT_GLOBAL');
+            setInput('');
+            setTimeout(() => setStatus('READY'), 2000);
+        } catch (error) {
+            console.error("Error sending broadcast:", error);
+            setStatus('ERROR_SENDING');
+        }
     };
 
     return (
@@ -69,7 +73,7 @@ const AdminConsole: React.FC = () => {
                     </button>
                 </form>
 
-                <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.8rem', color: status === 'BROADCAST_SENT' ? '#0f0' : '#444' }}>
+                <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.8rem', color: status === 'BROADCAST_SENT_GLOBAL' ? '#0f0' : '#444' }}>
                     STATUS: [{status}]
                 </div>
             </div>
