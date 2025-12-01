@@ -2,7 +2,9 @@ import CryptoChart from './components/CryptoChart';
 import InfoPanel from './components/InfoPanel';
 import Ticker from './components/Ticker';
 import Terminal from './components/Terminal';
+import HackerGif from './components/HackerGif';
 import { Shield, Activity, Database, Lock } from 'lucide-react';
+import hackerAnimation from './assets/hacker-animation.gif';
 
 function App() {
   return (
@@ -21,7 +23,7 @@ function App() {
         </header>
 
         {/* Main Chart */}
-        <div className="panel" style={{ gridColumn: '1 / 9', gridRow: '2 / 9' }}>
+        <div className="panel" style={{ gridColumn: '1 / 7', gridRow: '2 / 9' }}>
           <div className="panel-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Activity size={16} />
@@ -34,8 +36,19 @@ function App() {
           <CryptoChart />
         </div>
 
+        {/* Visual Feed (GIF) */}
+        <div className="panel" style={{ gridColumn: '7 / 10', gridRow: '2 / 9' }}>
+          <div className="panel-header">
+            <span>VISUAL_FEED</span>
+          </div>
+          <HackerGif
+            src={hackerAnimation}
+            caption="TARGET_ACQUIRED"
+          />
+        </div>
+
         {/* Info Panel */}
-        <div className="panel" style={{ gridColumn: '9 / -1', gridRow: '2 / 6' }}>
+        <div className="panel" style={{ gridColumn: '10 / -1', gridRow: '2 / 6' }}>
           <div className="panel-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Database size={16} />
@@ -49,7 +62,7 @@ function App() {
         </div>
 
         {/* Terminal */}
-        <div className="panel" style={{ gridColumn: '9 / -1', gridRow: '6 / 9' }}>
+        <div className="panel" style={{ gridColumn: '10 / -1', gridRow: '6 / 9' }}>
           <div className="panel-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Shield size={16} />
@@ -62,7 +75,7 @@ function App() {
           <Terminal />
         </div>
 
-        {/* Bottom Section (Maybe a secondary chart or just filler for now) */}
+        {/* Bottom Section - Encryption */}
         <div className="panel" style={{ gridColumn: '1 / 5', gridRow: '9 / 12' }}>
           <div className="panel-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
