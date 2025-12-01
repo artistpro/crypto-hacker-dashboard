@@ -43,7 +43,7 @@ const InfoPanel: React.FC = () => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="info-row">
-                <span className="label">RANK:</span>
+                <span className="label">RANK (COINGECKO):</span>
                 <span className="value">#{data.market_cap_rank}</span>
             </div>
             <div className="info-row">

@@ -14,7 +14,7 @@ function App() {
 
         {/* Header */}
         <header style={{ gridColumn: '1 / -1', gridRow: '1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #0f0', padding: '0 1rem' }}>
-          <h1 className="text-glow" style={{ fontSize: '1.5rem' }}>BCH_MONITOR_SYSTEM_V1.1</h1>
+          <h1 className="text-glow" style={{ fontSize: '1.5rem' }}>BCH_MONITOR_SYSTEM_V1.1.01</h1>
           <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem' }}>
             <span className="flicker">STATUS: ONLINE</span>
             <span>SECURE_CONNECTION</span>
