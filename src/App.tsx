@@ -1,4 +1,3 @@
-import React from 'react';
 import CryptoChart from './components/CryptoChart';
 import InfoPanel from './components/InfoPanel';
 import Ticker from './components/Ticker';
