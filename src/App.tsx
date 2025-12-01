@@ -6,7 +6,18 @@ import HackerGif from './components/HackerGif';
 import { Shield, Activity, Database, Lock } from 'lucide-react';
 import hackerAnimation from './assets/hacker-animation.gif';
 
+import DigitalMarquee from './components/DigitalMarquee';
+
+import AdminConsole from './components/AdminConsole';
+
 function App() {
+  // Simple routing based on pathname
+  const path = window.location.pathname;
+
+  if (path === '/admin') {
+    return <AdminConsole />;
+  }
+
   return (
     <>
       <div className="scanlines"></div>
@@ -110,6 +121,9 @@ function App() {
         </div>
 
       </div>
+
+      <DigitalMarquee message="*** ALERT: WHALE MOVEMENT DETECTED *** BCH ACCUMULATION ZONE *** CRYPTOMINDERS SIGNAL: BUY ***" />
+
       <Ticker />
     </>
   );

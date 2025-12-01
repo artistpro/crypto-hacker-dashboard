@@ -1,0 +1,102 @@
+import React from 'react';
+
+interface DigitalMarqueeProps {
+  message?: string;
+}
+
+const DigitalMarquee: React.FC<DigitalMarqueeProps> = ({
+  message: initialMessage = "SYSTEM ALERT: MONITORING ACTIVE // WELCOME ARTIST PRO // BCH NETWORK SECURE"
+}) => {
+  const [text, setText] = React.useState(initialMessage);
+
+  React.useEffect(() => {
+    // Check for saved message on mount
+    const saved = localStorage.getItem('marquee_message');
+    if (saved) setText(saved);
+
+    // Listen for changes from other tabs (Admin Console)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'marquee_message' && e.newValue) {
+        setText(e.newValue);
+      }
+    };
+
+    // Listen for changes within the same tab (if needed)
+    const handleCustom = () => {
+      const saved = localStorage.getItem('marquee_message');
+      if (saved) setText(saved);
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('marquee-update', handleCustom);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('marquee-update', handleCustom);
+    };
+  }, []);
+
+  return (
+    <div className="digital-marquee-container">
+      {/* LED Grid Background Texture */}
+      <div className="led-grid"></div>
+
+      <div className="marquee-content">
+        {text}
+      </div>
+
+      <style>{`
+        .digital-marquee-container {
+          width: 100%;
+          height: 40px;
+          background: #000;
+          border-top: 2px solid #0f0;
+          border-bottom: 2px solid #0f0;
+          position: fixed;
+          bottom: 2.5rem; /* Height of the ticker */
+          left: 0;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          z-index: 99;
+        }
+
+        .led-grid {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-image: radial-gradient(rgba(0, 50, 0, 0.3) 1px, transparent 1px);
+          background-size: 4px 4px;
+          z-index: 1;
+          pointer-events: none;
+        }
+
+        .marquee-content {
+          white-space: nowrap;
+          color: #0f0;
+          font-family: 'Courier New', monospace;
+          font-size: 1.2rem;
+          font-weight: bold;
+          text-transform: uppercase;
+          letter-spacing: 2px;
+          animation: scrollLeftToRight 15s linear infinite;
+          position: absolute;
+          text-shadow: 0 0 5px #0f0;
+        }
+
+        @keyframes scrollLeftToRight {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100vw);
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default DigitalMarquee;
