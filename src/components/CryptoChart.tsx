@@ -11,21 +11,36 @@ const CryptoChart: React.FC = () => {
     const wsRef = useRef<WebSocket | null>(null);
 
     useEffect(() => {
-        // 1. Fetch initial data (History) from CoinCap REST API
+        // 1. Fetch initial data (History) - Try CoinCap, fallback to CoinGecko
         const fetchInitialData = async () => {
             try {
-                // Fetch last 1 hour of minute data
+                // Try CoinCap first
                 const response = await fetch('https://api.coincap.io/v2/assets/bitcoin-cash/history?interval=m1');
-                const json = await response.json();
+                if (!response.ok) throw new Error('CoinCap API failed');
 
-                // CoinCap history format: { priceUsd: "...", time: 153... }
+                const json = await response.json();
                 const formattedData = json.data.slice(-50).map((t: any) => ({
                     time: t.time,
                     price: parseFloat(t.priceUsd)
                 }));
                 setData(formattedData);
             } catch (error) {
-                console.error("Error fetching initial CoinCap data:", error);
+                console.warn("CoinCap history failed, trying fallback...", error);
+
+                try {
+                    // Fallback: Get simple current price from CoinGecko to start the line
+                    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=usd');
+                    const json = await response.json();
+                    const price = json['bitcoin-cash'].usd;
+
+                    // Create a single starting point
+                    setData([{
+                        time: Date.now(),
+                        price: price
+                    }]);
+                } catch (err2) {
+                    console.error("All initial data fetches failed. Waiting for WebSocket.", err2);
+                }
             }
         };
 
@@ -121,7 +136,7 @@ const CryptoChart: React.FC = () => {
             </ResponsiveContainer>
 
             {/* Current Price Overlay */}
-            {data.length > 0 && (
+            {data.length > 0 ? (
                 <div style={{
                     position: 'absolute',
                     top: '1rem',
@@ -139,6 +154,18 @@ const CryptoChart: React.FC = () => {
                         ${data[data.length - 1].price.toFixed(2)}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: '#0f0', opacity: 0.8 }}>CURRENT PRICE</div>
+                </div>
+            ) : (
+                <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    color: '#0f0',
+                    fontFamily: 'Courier New',
+                    textAlign: 'center'
+                }}>
+                    <div className="flicker">ESTABLISHING UPLINK...</div>
                 </div>
             )}
         </div>
