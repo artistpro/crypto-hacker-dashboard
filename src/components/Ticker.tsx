@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 
-interface TickerData {
-    s: string; // Symbol
-    c: string; // Close price
-    p: string; // Price change
-    P: string; // Price change percent
-}
-
-const SYMBOLS: { [key: string]: string } = {
-    BCHUSDT: 'BCH',
-    BTCUSDT: 'BTC',
-    ETHUSDT: 'ETH',
-    XMRUSDT: 'XMR',
-    DOGEUSDT: 'DOGE',
-    RONINUSDT: 'RONIN'
+const COINCAP_IDS: { [key: string]: string } = {
+    'bitcoin': 'BTC',
+    'ethereum': 'ETH',
+    'bitcoin-cash': 'BCH',
+    'monero': 'XMR',
+    'dogecoin': 'DOGE',
+    'ronin': 'RONIN'
 };
+
+interface TickerData {
+    s: string; // Symbol (BTC)
+    c: string; // Current Price
+    p: string; // Price Change (calculated or fetched)
+    P: string; // Price Change Percent
+}
 
 const Ticker: React.FC = () => {
     const [prices, setPrices] = useState<{ [key: string]: TickerData }>({});
@@ -24,20 +24,57 @@ const Ticker: React.FC = () => {
         let ws: WebSocket | null = null;
         let reconnectTimeout: ReturnType<typeof setTimeout>;
 
+        // 1. Fetch Initial Data (Prices + 24h Change) from REST API
+        const fetchInitialData = async () => {
+            try {
+                const ids = Object.keys(COINCAP_IDS).join(',');
+                const response = await fetch(`https://api.coincap.io/v2/assets?ids=${ids}`);
+                const json = await response.json();
+
+                const initialData: { [key: string]: TickerData } = {};
+                json.data.forEach((asset: any) => {
+                    initialData[asset.id] = {
+                        s: COINCAP_IDS[asset.id],
+                        c: parseFloat(asset.priceUsd).toFixed(2),
+                        p: '0.00', // CoinCap doesn't give absolute change easily, we focus on %
+                        P: parseFloat(asset.changePercent24Hr).toFixed(2)
+                    };
+                });
+                setPrices(initialData);
+            } catch (error) {
+                console.error("Error fetching initial CoinCap data:", error);
+            }
+        };
+
+        fetchInitialData();
+
+        // 2. Connect to CoinCap WebSocket for Real-Time Prices
         const connectWebSocket = () => {
             if (ws) ws.close();
 
-            const streams = Object.keys(SYMBOLS).map(s => `${s.toLowerCase()}@ticker`).join('/');
-            ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+            const assets = Object.keys(COINCAP_IDS).join(',');
+            ws = new WebSocket(`wss://ws.coincap.io/prices?assets=${assets}`);
 
             ws.onopen = () => {
-                console.log('✅ Ticker WebSocket Connected');
+                console.log('✅ Ticker WebSocket Connected (CoinCap)');
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                const ticker = data.data as TickerData;
-                setPrices(prev => ({ ...prev, [ticker.s]: ticker }));
+                // CoinCap sends: { "bitcoin": "63000.50", "ethereum": "3400.20" }
+
+                setPrices(prev => {
+                    const updated = { ...prev };
+                    Object.keys(data).forEach(id => {
+                        if (updated[id]) {
+                            updated[id] = {
+                                ...updated[id],
+                                c: parseFloat(data[id]).toFixed(2)
+                            };
+                        }
+                    });
+                    return updated;
+                });
             };
 
             ws.onclose = () => {
@@ -60,17 +97,15 @@ const Ticker: React.FC = () => {
     }, []);
 
     const renderTickerItems = () => {
-        const items = Object.keys(SYMBOLS).map(symbol => {
-            const data = prices[symbol];
-            if (!data) return null;
-
-            const price = parseFloat(data.c).toFixed(2);
-            const change = parseFloat(data.P).toFixed(2);
-            const isUp = parseFloat(data.p) >= 0;
+        const items = Object.keys(prices).map(id => {
+            const data = prices[id];
+            const price = data.c;
+            const change = data.P;
+            const isUp = parseFloat(change) >= 0;
 
             return (
-                <div key={symbol} className="ticker-item" style={{ display: 'inline-flex', alignItems: 'center', color: isUp ? '#0f0' : '#ff3333' }}>
-                    <span style={{ color: '#fff', marginRight: '0.5rem', textShadow: '0 0 5px #0f0' }}>{SYMBOLS[symbol]}:</span>
+                <div key={id} className="ticker-item" style={{ display: 'inline-flex', alignItems: 'center', color: isUp ? '#0f0' : '#ff3333' }}>
+                    <span style={{ color: '#fff', marginRight: '0.5rem', textShadow: '0 0 5px #0f0' }}>{data.s}:</span>
                     <span style={{ color: '#fff', fontWeight: '900', letterSpacing: '1px' }}>${price}</span>
                     <span style={{ marginLeft: '0.5rem', fontSize: '0.9em', opacity: 0.9 }}>
                         {isUp ? <ArrowUp size={16} /> : <ArrowDown size={16} />}

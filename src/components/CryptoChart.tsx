@@ -11,24 +11,27 @@ const CryptoChart: React.FC = () => {
     const wsRef = useRef<WebSocket | null>(null);
 
     useEffect(() => {
-        // 1. Fetch initial data (Snapshot)
+        // 1. Fetch initial data (History) from CoinCap REST API
         const fetchInitialData = async () => {
             try {
-                const response = await fetch('https://api.binance.com/api/v3/trades?symbol=BCHUSDT&limit=50');
-                const trades = await response.json();
-                const formattedData = trades.map((t: any) => ({
+                // Fetch last 1 hour of minute data
+                const response = await fetch('https://api.coincap.io/v2/assets/bitcoin-cash/history?interval=m1');
+                const json = await response.json();
+
+                // CoinCap history format: { priceUsd: "...", time: 153... }
+                const formattedData = json.data.slice(-50).map((t: any) => ({
                     time: t.time,
-                    price: parseFloat(t.price)
+                    price: parseFloat(t.priceUsd)
                 }));
                 setData(formattedData);
             } catch (error) {
-                console.error("Error fetching initial data:", error);
+                console.error("Error fetching initial CoinCap data:", error);
             }
         };
 
         fetchInitialData();
 
-        // 2. Robust WebSocket Connection with Auto-Reconnect
+        // 2. Robust WebSocket Connection with Auto-Reconnect (CoinCap)
         let ws: WebSocket | null = null;
         let reconnectTimeout: ReturnType<typeof setTimeout>;
 
@@ -37,25 +40,30 @@ const CryptoChart: React.FC = () => {
                 ws.close();
             }
 
-            ws = new WebSocket('wss://stream.binance.com:9443/ws/bchusdt@trade');
+            // CoinCap Prices WS
+            ws = new WebSocket('wss://ws.coincap.io/prices?assets=bitcoin-cash');
             wsRef.current = ws;
 
             ws.onopen = () => {
-                console.log('✅ CryptoChart WebSocket Connected');
+                console.log('✅ CryptoChart WebSocket Connected (CoinCap)');
             };
 
             ws.onmessage = (event) => {
                 const message = JSON.parse(event.data);
-                const trade = {
-                    time: message.T,
-                    price: parseFloat(message.p),
-                };
+                // CoinCap sends: { "bitcoin-cash": "450.23" }
 
-                setData(prev => {
-                    const newData = [...prev, trade];
-                    if (newData.length > 50) return newData.slice(newData.length - 50);
-                    return newData;
-                });
+                if (message['bitcoin-cash']) {
+                    const trade = {
+                        time: Date.now(),
+                        price: parseFloat(message['bitcoin-cash']),
+                    };
+
+                    setData(prev => {
+                        const newData = [...prev, trade];
+                        if (newData.length > 50) return newData.slice(newData.length - 50);
+                        return newData;
+                    });
+                }
             };
 
             ws.onclose = () => {
