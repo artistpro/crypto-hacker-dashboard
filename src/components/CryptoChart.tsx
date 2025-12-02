@@ -11,6 +11,24 @@ const CryptoChart: React.FC = () => {
     const wsRef = useRef<WebSocket | null>(null);
 
     useEffect(() => {
+        // 1. Fetch initial data (Snapshot)
+        const fetchInitialData = async () => {
+            try {
+                const response = await fetch('https://api.binance.com/api/v3/trades?symbol=BCHUSDT&limit=50');
+                const trades = await response.json();
+                const formattedData = trades.map((t: any) => ({
+                    time: t.time,
+                    price: parseFloat(t.price)
+                }));
+                setData(formattedData);
+            } catch (error) {
+                console.error("Error fetching initial data:", error);
+            }
+        };
+
+        fetchInitialData();
+
+        // 2. Connect to WebSocket (Real-time updates)
         wsRef.current = new WebSocket('wss://stream.binance.com:9443/ws/bchusdt@trade');
 
         wsRef.current.onmessage = (event) => {
@@ -22,6 +40,7 @@ const CryptoChart: React.FC = () => {
 
             setData(prev => {
                 const newData = [...prev, trade];
+                // Keep only last 50 points to match the snapshot size and keep performance high
                 if (newData.length > 50) return newData.slice(newData.length - 50);
                 return newData;
             });
