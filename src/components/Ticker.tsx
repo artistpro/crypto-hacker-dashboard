@@ -66,11 +66,25 @@ const Ticker: React.FC = () => {
                 setPrices(prev => {
                     const updated = { ...prev };
                     Object.keys(data).forEach(id => {
-                        if (updated[id]) {
-                            updated[id] = {
-                                ...updated[id],
-                                c: parseFloat(data[id]).toFixed(2)
-                            };
+                        // If ID is in our tracked list
+                        if (COINCAP_IDS[id]) {
+                            const currentPrice = parseFloat(data[id]).toFixed(2);
+
+                            if (updated[id]) {
+                                // Update existing
+                                updated[id] = {
+                                    ...updated[id],
+                                    c: currentPrice
+                                };
+                            } else {
+                                // Create new if missing (fallback if REST failed)
+                                updated[id] = {
+                                    s: COINCAP_IDS[id],
+                                    c: currentPrice,
+                                    p: '0.00',
+                                    P: '0.00' // We won't have 24h change immediately from WS, but better than nothing
+                                };
+                            }
                         }
                     });
                     return updated;
