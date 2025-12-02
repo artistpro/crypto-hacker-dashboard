@@ -36,7 +36,7 @@ const DigitalMarquee: React.FC<DigitalMarqueeProps> = ({
       <style>{`
         .digital-marquee-container {
           width: 100%;
-          height: 40px;
+          height: 62px; /* Increased by another 15% (from 54px) */
           background: #000;
           border-top: 2px solid #0f0;
           border-bottom: 2px solid #0f0;
@@ -65,11 +65,11 @@ const DigitalMarquee: React.FC<DigitalMarqueeProps> = ({
           white-space: nowrap;
           color: #0f0;
           font-family: 'Courier New', monospace;
-          font-size: 1.2rem;
+          font-size: 2.15rem; /* Increased text size by another 15% (from 1.85rem) */
           font-weight: bold;
           text-transform: uppercase;
           letter-spacing: 2px;
-          animation: scrollRightToLeft 30s linear infinite;
+          animation: scrollRightToLeft 50s linear infinite;
           position: absolute;
           text-shadow: 0 0 5px #0f0;
         }
