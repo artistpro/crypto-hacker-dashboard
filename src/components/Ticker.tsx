@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 
-const COINCAP_IDS: { [key: string]: string } = {
+const COINGECKO_IDS = [
+    'bitcoin',
+    'ethereum',
+    'bitcoin-cash',
+    'monero',
+    'dogecoin',
+    'ronin'
+];
+
+const SYMBOL_MAP: { [key: string]: string } = {
     'bitcoin': 'BTC',
     'ethereum': 'ETH',
     'bitcoin-cash': 'BCH',
@@ -11,119 +20,53 @@ const COINCAP_IDS: { [key: string]: string } = {
 };
 
 interface TickerData {
-    s: string; // Symbol (BTC)
-    c: string; // Current Price
-    p: string; // Price Change (calculated or fetched)
-    P: string; // Price Change Percent
+    id: string;
+    symbol: string;
+    current_price: number;
+    price_change_percentage_24h: number;
 }
 
 const Ticker: React.FC = () => {
-    const [prices, setPrices] = useState<{ [key: string]: TickerData }>({});
+    const [prices, setPrices] = useState<TickerData[]>([]);
+
+    const fetchPrices = async () => {
+        try {
+            const ids = COINGECKO_IDS.join(',');
+            const response = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=10&page=1&sparkline=false`);
+
+            if (!response.ok) throw new Error('CoinGecko API failed');
+
+            const data = await response.json();
+            const formattedData = data.map((coin: any) => ({
+                id: coin.id,
+                symbol: SYMBOL_MAP[coin.id] || coin.symbol.toUpperCase(),
+                current_price: coin.current_price,
+                price_change_percentage_24h: coin.price_change_percentage_24h
+            }));
+
+            setPrices(formattedData);
+        } catch (error) {
+            console.error("Error fetching ticker data:", error);
+        }
+    };
 
     useEffect(() => {
-        let ws: WebSocket | null = null;
-        let reconnectTimeout: ReturnType<typeof setTimeout>;
+        fetchPrices(); // Initial fetch
+        const interval = setInterval(fetchPrices, 10000); // Poll every 10s
 
-        // 1. Fetch Initial Data (Prices + 24h Change) from REST API
-        const fetchInitialData = async () => {
-            try {
-                const ids = Object.keys(COINCAP_IDS).join(',');
-                const response = await fetch(`https://api.coincap.io/v2/assets?ids=${ids}`);
-                const json = await response.json();
-
-                const initialData: { [key: string]: TickerData } = {};
-                json.data.forEach((asset: any) => {
-                    initialData[asset.id] = {
-                        s: COINCAP_IDS[asset.id],
-                        c: parseFloat(asset.priceUsd).toFixed(2),
-                        p: '0.00', // CoinCap doesn't give absolute change easily, we focus on %
-                        P: parseFloat(asset.changePercent24Hr).toFixed(2)
-                    };
-                });
-                setPrices(initialData);
-            } catch (error) {
-                console.error("Error fetching initial CoinCap data:", error);
-            }
-        };
-
-        fetchInitialData();
-
-        // 2. Connect to CoinCap WebSocket for Real-Time Prices
-        const connectWebSocket = () => {
-            if (ws) ws.close();
-
-            const assets = Object.keys(COINCAP_IDS).join(',');
-            ws = new WebSocket(`wss://ws.coincap.io/prices?assets=${assets}`);
-
-            ws.onopen = () => {
-                console.log('✅ Ticker WebSocket Connected (CoinCap)');
-            };
-
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                // CoinCap sends: { "bitcoin": "63000.50", "ethereum": "3400.20" }
-
-                setPrices(prev => {
-                    const updated = { ...prev };
-                    Object.keys(data).forEach(id => {
-                        // If ID is in our tracked list
-                        if (COINCAP_IDS[id]) {
-                            const currentPrice = parseFloat(data[id]).toFixed(2);
-
-                            if (updated[id]) {
-                                // Update existing
-                                updated[id] = {
-                                    ...updated[id],
-                                    c: currentPrice
-                                };
-                            } else {
-                                // Create new if missing (fallback if REST failed)
-                                updated[id] = {
-                                    s: COINCAP_IDS[id],
-                                    c: currentPrice,
-                                    p: '0.00',
-                                    P: '0.00' // We won't have 24h change immediately from WS, but better than nothing
-                                };
-                            }
-                        }
-                    });
-                    return updated;
-                });
-            };
-
-            ws.onclose = () => {
-                console.log('⚠️ Ticker WebSocket Closed. Reconnecting in 3s...');
-                reconnectTimeout = setTimeout(connectWebSocket, 3000);
-            };
-
-            ws.onerror = (err) => {
-                console.error('❌ Ticker WebSocket Error:', err);
-                ws?.close();
-            };
-        };
-
-        connectWebSocket();
-
-        return () => {
-            if (ws) ws.close();
-            clearTimeout(reconnectTimeout);
-        };
+        return () => clearInterval(interval);
     }, []);
 
     const renderTickerItems = () => {
-        const items = Object.keys(prices).map(id => {
-            const data = prices[id];
-            const price = data.c;
-            const change = data.P;
-            const isUp = parseFloat(change) >= 0;
-
+        const items = prices.map(coin => {
+            const isUp = coin.price_change_percentage_24h >= 0;
             return (
-                <div key={id} className="ticker-item" style={{ display: 'inline-flex', alignItems: 'center', color: isUp ? '#0f0' : '#ff3333' }}>
-                    <span style={{ color: '#fff', marginRight: '0.5rem', textShadow: '0 0 5px #0f0' }}>{data.s}:</span>
-                    <span style={{ color: '#fff', fontWeight: '900', letterSpacing: '1px' }}>${price}</span>
+                <div key={coin.id} className="ticker-item" style={{ display: 'inline-flex', alignItems: 'center', color: isUp ? '#0f0' : '#ff3333' }}>
+                    <span style={{ color: '#fff', marginRight: '0.5rem', textShadow: '0 0 5px #0f0' }}>{coin.symbol}:</span>
+                    <span style={{ color: '#fff', fontWeight: '900', letterSpacing: '1px' }}>${coin.current_price.toLocaleString()}</span>
                     <span style={{ marginLeft: '0.5rem', fontSize: '0.9em', opacity: 0.9 }}>
                         {isUp ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
-                        {change}%
+                        {coin.price_change_percentage_24h.toFixed(2)}%
                     </span>
                 </div>
             );
@@ -139,14 +82,14 @@ const Ticker: React.FC = () => {
         return items;
     };
 
-    const items = renderTickerItems();
-
     return (
         <div className="ticker-container">
             <div className="ticker-content">
-                {/* Render two sets for seamless infinite scroll (0 to -50%) */}
-                <div style={{ display: 'flex' }}>{items}</div>
-                <div style={{ display: 'flex' }}>{items}</div>
+                {/* Duplicate items for infinite scroll effect */}
+                {renderTickerItems()}
+                {renderTickerItems()}
+                {renderTickerItems()}
+                {renderTickerItems()}
             </div>
         </div>
     );

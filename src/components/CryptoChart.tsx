@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface TradeData {
@@ -8,97 +8,60 @@ interface TradeData {
 
 const CryptoChart: React.FC = () => {
     const [data, setData] = useState<TradeData[]>([]);
-    const wsRef = useRef<WebSocket | null>(null);
+
+    const fetchHistory = async () => {
+        try {
+            // Get last 1 hour of data (approx) from CoinGecko
+            // 'days=1' gives hourly data, 'days=0.04' gives minute data approx
+            const response = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin-cash/market_chart?vs_currency=usd&days=0.04');
+            if (!response.ok) throw new Error('CoinGecko History API failed');
+
+            const json = await response.json();
+            const prices = json.prices; // [[timestamp, price], ...]
+
+            const formattedData = prices.slice(-50).map((p: [number, number]) => ({
+                time: p[0],
+                price: p[1]
+            }));
+
+            setData(formattedData);
+        } catch (error) {
+            console.error("Error fetching history:", error);
+            // If history fails, start with empty array, live polling will fill it
+        }
+    };
+
+    const fetchCurrentPrice = async () => {
+        try {
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=usd');
+            if (!response.ok) throw new Error('CoinGecko Price API failed');
+
+            const json = await response.json();
+            const price = json['bitcoin-cash'].usd;
+
+            const newPoint = {
+                time: Date.now(),
+                price: price
+            };
+
+            setData(prev => {
+                const newData = [...prev, newPoint];
+                if (newData.length > 50) return newData.slice(newData.length - 50);
+                return newData;
+            });
+        } catch (error) {
+            console.error("Error fetching current price:", error);
+        }
+    };
 
     useEffect(() => {
-        // 1. Fetch initial data (History) - Try CoinCap, fallback to CoinGecko
-        const fetchInitialData = async () => {
-            try {
-                // Try CoinCap first
-                const response = await fetch('https://api.coincap.io/v2/assets/bitcoin-cash/history?interval=m1');
-                if (!response.ok) throw new Error('CoinCap API failed');
+        // 1. Load initial history
+        fetchHistory();
 
-                const json = await response.json();
-                const formattedData = json.data.slice(-50).map((t: any) => ({
-                    time: t.time,
-                    price: parseFloat(t.priceUsd)
-                }));
-                setData(formattedData);
-            } catch (error) {
-                console.warn("CoinCap history failed, trying fallback...", error);
+        // 2. Start polling for live updates
+        const interval = setInterval(fetchCurrentPrice, 5000); // Poll every 5s
 
-                try {
-                    // Fallback: Get simple current price from CoinGecko to start the line
-                    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=usd');
-                    const json = await response.json();
-                    const price = json['bitcoin-cash'].usd;
-
-                    // Create a single starting point
-                    setData([{
-                        time: Date.now(),
-                        price: price
-                    }]);
-                } catch (err2) {
-                    console.error("All initial data fetches failed. Waiting for WebSocket.", err2);
-                }
-            }
-        };
-
-        fetchInitialData();
-
-        // 2. Robust WebSocket Connection with Auto-Reconnect (CoinCap)
-        let ws: WebSocket | null = null;
-        let reconnectTimeout: ReturnType<typeof setTimeout>;
-
-        const connectWebSocket = () => {
-            if (ws) {
-                ws.close();
-            }
-
-            // CoinCap Prices WS
-            ws = new WebSocket('wss://ws.coincap.io/prices?assets=bitcoin-cash');
-            wsRef.current = ws;
-
-            ws.onopen = () => {
-                console.log('✅ CryptoChart WebSocket Connected (CoinCap)');
-            };
-
-            ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                // CoinCap sends: { "bitcoin-cash": "450.23" }
-
-                if (message['bitcoin-cash']) {
-                    const trade = {
-                        time: Date.now(),
-                        price: parseFloat(message['bitcoin-cash']),
-                    };
-
-                    setData(prev => {
-                        const newData = [...prev, trade];
-                        if (newData.length > 50) return newData.slice(newData.length - 50);
-                        return newData;
-                    });
-                }
-            };
-
-            ws.onclose = () => {
-                console.log('⚠️ CryptoChart WebSocket Closed. Reconnecting in 3s...');
-                reconnectTimeout = setTimeout(connectWebSocket, 3000);
-            };
-
-            ws.onerror = (err) => {
-                console.error('❌ CryptoChart WebSocket Error:', err);
-                ws?.close(); // Trigger onclose to reconnect
-            };
-        };
-
-        connectWebSocket();
-
-        // Cleanup
-        return () => {
-            if (ws) ws.close();
-            clearTimeout(reconnectTimeout);
-        };
+        return () => clearInterval(interval);
     }, []);
 
     return (
