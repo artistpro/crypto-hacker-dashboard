@@ -28,26 +28,53 @@ const CryptoChart: React.FC = () => {
 
         fetchInitialData();
 
-        // 2. Connect to WebSocket (Real-time updates)
-        wsRef.current = new WebSocket('wss://stream.binance.com:9443/ws/bchusdt@trade');
+        // 2. Robust WebSocket Connection with Auto-Reconnect
+        let ws: WebSocket | null = null;
+        let reconnectTimeout: ReturnType<typeof setTimeout>;
 
-        wsRef.current.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            const trade = {
-                time: message.T,
-                price: parseFloat(message.p),
+        const connectWebSocket = () => {
+            if (ws) {
+                ws.close();
+            }
+
+            ws = new WebSocket('wss://stream.binance.com:9443/ws/bchusdt@trade');
+            wsRef.current = ws;
+
+            ws.onopen = () => {
+                console.log('✅ CryptoChart WebSocket Connected');
             };
 
-            setData(prev => {
-                const newData = [...prev, trade];
-                // Keep only last 50 points to match the snapshot size and keep performance high
-                if (newData.length > 50) return newData.slice(newData.length - 50);
-                return newData;
-            });
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                const trade = {
+                    time: message.T,
+                    price: parseFloat(message.p),
+                };
+
+                setData(prev => {
+                    const newData = [...prev, trade];
+                    if (newData.length > 50) return newData.slice(newData.length - 50);
+                    return newData;
+                });
+            };
+
+            ws.onclose = () => {
+                console.log('⚠️ CryptoChart WebSocket Closed. Reconnecting in 3s...');
+                reconnectTimeout = setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (err) => {
+                console.error('❌ CryptoChart WebSocket Error:', err);
+                ws?.close(); // Trigger onclose to reconnect
+            };
         };
 
+        connectWebSocket();
+
+        // Cleanup
         return () => {
-            wsRef.current?.close();
+            if (ws) ws.close();
+            clearTimeout(reconnectTimeout);
         };
     }, []);
 

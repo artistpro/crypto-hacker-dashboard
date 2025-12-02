@@ -21,16 +21,42 @@ const Ticker: React.FC = () => {
     const [prices, setPrices] = useState<{ [key: string]: TickerData }>({});
 
     useEffect(() => {
-        const streams = Object.keys(SYMBOLS).map(s => `${s.toLowerCase()}@ticker`).join('/');
-        const ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+        let ws: WebSocket | null = null;
+        let reconnectTimeout: ReturnType<typeof setTimeout>;
 
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            const ticker = data.data as TickerData;
-            setPrices(prev => ({ ...prev, [ticker.s]: ticker }));
+        const connectWebSocket = () => {
+            if (ws) ws.close();
+
+            const streams = Object.keys(SYMBOLS).map(s => `${s.toLowerCase()}@ticker`).join('/');
+            ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+
+            ws.onopen = () => {
+                console.log('✅ Ticker WebSocket Connected');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const ticker = data.data as TickerData;
+                setPrices(prev => ({ ...prev, [ticker.s]: ticker }));
+            };
+
+            ws.onclose = () => {
+                console.log('⚠️ Ticker WebSocket Closed. Reconnecting in 3s...');
+                reconnectTimeout = setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (err) => {
+                console.error('❌ Ticker WebSocket Error:', err);
+                ws?.close();
+            };
         };
 
-        return () => ws.close();
+        connectWebSocket();
+
+        return () => {
+            if (ws) ws.close();
+            clearTimeout(reconnectTimeout);
+        };
     }, []);
 
     const renderTickerItems = () => {
