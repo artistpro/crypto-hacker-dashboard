@@ -3,6 +3,7 @@ import InfoPanel from './components/InfoPanel';
 import Ticker from './components/Ticker';
 import Terminal from './components/Terminal';
 import HackerGif from './components/HackerGif';
+import BlockMonitor from './components/BlockMonitor';
 import { Shield, Activity, Database, Lock } from 'lucide-react';
 import hackerAnimation from './assets/hacker-animation.gif';
 
@@ -86,21 +87,9 @@ function App() {
           <Terminal />
         </div>
 
-        {/* Bottom Section - Encryption */}
+        {/* Bottom Section - Block Monitor */}
         <div className="panel" style={{ gridColumn: '1 / 5', gridRow: '9 / 12' }}>
-          <div className="panel-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Lock size={16} />
-              <span>ENCRYPTION</span>
-            </div>
-          </div>
-          <div style={{ fontSize: '0.7rem', wordBreak: 'break-all', opacity: 0.7 }}>
-            {Array(20).fill(0).map((_, i) => (
-              <span key={i} style={{ opacity: Math.random() }}>
-                {Math.random().toString(36).substring(2)}
-              </span>
-            ))}
-          </div>
+          <BlockMonitor />
         </div>
 
         <div className="panel" style={{ gridColumn: '5 / -1', gridRow: '9 / 12' }}>
