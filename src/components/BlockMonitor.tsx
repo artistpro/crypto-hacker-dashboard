@@ -4,10 +4,8 @@ import { db } from '../firebase';
 import { Box, Volume2, VolumeX } from 'lucide-react';
 
 interface BlockData {
-    id: number;
     height: number;
-    time: string; // "YYYY-MM-DD HH:MM:SS" (UTC)
-    hash: string;
+    time: number; // Unix timestamp (seconds)
 }
 
 const BlockMonitor: React.FC = () => {
@@ -18,36 +16,77 @@ const BlockMonitor: React.FC = () => {
     const [flash, setFlash] = useState(false);
     const lastBlockHeight = useRef<number>(0);
 
-    // 1. Listen for Sound Setting from Firebase
+    // 1. Listen for Sound Setting
     useEffect(() => {
         const soundRef = ref(db, 'settings/soundEnabled');
         const unsubscribe = onValue(soundRef, (snapshot) => {
             const val = snapshot.val();
-            if (val !== null) {
-                setSoundEnabled(val);
-            }
+            if (val !== null) setSoundEnabled(val);
         });
         return () => unsubscribe();
     }, []);
 
-    // 2. Poll Blockchair API (Blocks Endpoint)
+    // 2. Multi-Source Fetching Strategy
     const fetchBlockData = async () => {
+        const now = Date.now();
+
+        // Define sources
+        const sources = [
+            // Source A: Haskoin
+            async () => {
+                const res = await fetch(`https://api.blockchain.info/haskoin-store/bch/block/best?t=${now}`);
+                if (!res.ok) throw new Error('Haskoin failed');
+                const data = await res.json();
+                return { height: data.height, time: data.time };
+            },
+            // Source B: Blockchair (Backup)
+            async () => {
+                const res = await fetch(`https://api.blockchair.com/bitcoin-cash/blocks?limit=1&t=${now}`);
+                if (!res.ok) throw new Error('Blockchair failed');
+                const json = await res.json();
+                const latest = json.data[0];
+                // Blockchair time is "YYYY-MM-DD HH:MM:SS", need to convert to Unix
+                const time = new Date(latest.time.replace(' ', 'T') + 'Z').getTime() / 1000;
+                return { height: latest.id, time: time };
+            }
+        ];
+
         try {
-            const response = await fetch('https://api.blockchair.com/bitcoin-cash/blocks?limit=1');
-            if (!response.ok) throw new Error('Blockchair API failed');
+            // Race/All approach: Try all, pick the best (highest height)
+            const results = await Promise.allSettled(sources.map(src => src()));
 
-            const json = await response.json();
-            const latest = json.data[0]; // First item is latest block
+            let bestBlock: BlockData | null = null;
 
-            if (latest) {
-                setBlock(latest);
+            results.forEach(result => {
+                if (result.status === 'fulfilled' && result.value) {
+                    const b = result.value;
+                    if (!bestBlock || b.height > bestBlock.height) {
+                        bestBlock = b;
+                    }
+                }
+            });
 
-                // Check for new block
-                if (lastBlockHeight.current !== 0 && latest.id > lastBlockHeight.current) {
+            if (bestBlock) {
+                // Update state if we found a block
+                setBlock(prev => {
+                    // Only update if it's newer or same (to update timer reference)
+                    if (!prev || bestBlock!.height >= prev.height) {
+                        return bestBlock;
+                    }
+                    return prev;
+                });
+
+                // Check for alert (strictly greater height)
+                if (lastBlockHeight.current !== 0 && bestBlock.height > lastBlockHeight.current) {
                     triggerAlert();
                 }
-                lastBlockHeight.current = latest.id;
+
+                // Update ref if higher
+                if (bestBlock.height > lastBlockHeight.current) {
+                    lastBlockHeight.current = bestBlock.height;
+                }
             }
+
         } catch (error) {
             console.error("Error fetching block data:", error);
         }
@@ -63,12 +102,10 @@ const BlockMonitor: React.FC = () => {
     useEffect(() => {
         if (!block) return;
 
-        // Parse Block Time (UTC)
-        // Blockchair format: "2023-10-27 10:00:00" -> Treat as UTC
-        const blockDate = new Date(block.time.replace(' ', 'T') + 'Z');
-        const blockTimestamp = blockDate.getTime();
+        const blockTimestamp = block.time * 1000;
+        const blockDate = new Date(blockTimestamp);
 
-        // Format as EST
+        // Format EST
         const estString = blockDate.toLocaleTimeString('en-US', {
             timeZone: 'America/New_York',
             hour: '2-digit',
@@ -97,36 +134,26 @@ const BlockMonitor: React.FC = () => {
     const triggerAlert = () => {
         setFlash(true);
         setTimeout(() => setFlash(false), 5000);
-
-        if (soundEnabled) {
-            playBeep();
-        }
+        if (soundEnabled) playBeep();
     };
 
     const playBeep = () => {
         try {
             const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
             if (!AudioContext) return;
-
             const audioCtx = new AudioContext();
             const oscillator = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
-
             oscillator.connect(gainNode);
             gainNode.connect(audioCtx.destination);
-
             oscillator.type = 'square';
             oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
-
             gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-
             oscillator.start();
             oscillator.stop(audioCtx.currentTime + 0.5);
-        } catch (e) {
-            console.error("Audio play failed", e);
-        }
+        } catch (e) { console.error(e); }
     };
 
     return (
@@ -156,7 +183,7 @@ const BlockMonitor: React.FC = () => {
                         {timeSinceLast}
                     </div>
                     <div style={{ fontSize: '0.7rem', marginTop: '0.2rem', opacity: 0.6 }}>
-                        HEIGHT: {block.id.toLocaleString()}
+                        HEIGHT: {block.height.toLocaleString()}
                     </div>
                 </div>
             ) : (
