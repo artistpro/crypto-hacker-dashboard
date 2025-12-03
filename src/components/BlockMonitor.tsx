@@ -55,16 +55,13 @@ const BlockMonitor: React.FC = () => {
             // Race/All approach: Try all, pick the best (highest height)
             const results = await Promise.allSettled(sources.map(src => src()));
 
-            let bestBlock: BlockData | null = null;
+            const validBlocks = results
+                .filter((r): r is PromiseFulfilledResult<BlockData> => r.status === 'fulfilled')
+                .map(r => r.value);
 
-            results.forEach(result => {
-                if (result.status === 'fulfilled' && result.value) {
-                    const b = result.value;
-                    if (!bestBlock || b.height > bestBlock.height) {
-                        bestBlock = b;
-                    }
-                }
-            });
+            const bestBlock = validBlocks.reduce((prev, current) => {
+                return (prev && prev.height > current.height) ? prev : current;
+            }, null as BlockData | null);
 
             if (bestBlock) {
                 // Update state if we found a block
