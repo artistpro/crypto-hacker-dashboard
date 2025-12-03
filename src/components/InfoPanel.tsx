@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 
 interface CoinData {
-    market_cap_rank: number;
-    market_data: {
-        current_price: { usd: number };
-        market_cap: { usd: number };
-        total_volume: { usd: number };
-        circulating_supply: number;
-        high_24h: { usd: number };
-        low_24h: { usd: number };
+    rank: number;
+    quotes: {
+        USD: {
+            price: number;
+            market_cap: number;
+            volume_24h: number;
+            percent_change_24h: number;
+            ath_price: number;
+        }
     };
+    circulating_supply: number;
+    max_supply: number;
 }
 
 const InfoPanel: React.FC = () => {
@@ -20,8 +22,12 @@ const InfoPanel: React.FC = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await axios.get('https://api.coingecko.com/api/v3/coins/bitcoin-cash');
-                setData(response.data);
+                // Using CoinPaprika API (No API Key needed, very reliable)
+                const response = await fetch('https://api.coinpaprika.com/v1/tickers/bch-bitcoin-cash');
+                if (!response.ok) throw new Error('API Error');
+
+                const json = await response.json();
+                setData(json);
                 setLoading(false);
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -35,7 +41,7 @@ const InfoPanel: React.FC = () => {
     }, []);
 
     if (loading) return <div className="flicker">INITIALIZING DATA STREAM...</div>;
-    if (!data) return <div className="text-red-500">CONNECTION ERROR</div>;
+    if (!data) return <div className="text-red-500">CONNECTION ERROR (RETRYING...)</div>;
 
     const formatCurrency = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
     const formatNumber = (val: number) => new Intl.NumberFormat('en-US').format(val);
@@ -43,28 +49,28 @@ const InfoPanel: React.FC = () => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="info-row">
-                <span className="label">RANK (COINGECKO):</span>
-                <span className="value">#{data.market_cap_rank}</span>
+                <span className="label">RANK (PAPRIKA):</span>
+                <span className="value">#{data.rank}</span>
             </div>
             <div className="info-row">
                 <span className="label">MARKET CAP:</span>
-                <span className="value">{formatCurrency(data.market_data.market_cap.usd)}</span>
+                <span className="value">{formatCurrency(data.quotes.USD.market_cap)}</span>
             </div>
             <div className="info-row">
                 <span className="label">24H VOLUME:</span>
-                <span className="value">{formatCurrency(data.market_data.total_volume.usd)}</span>
+                <span className="value">{formatCurrency(data.quotes.USD.volume_24h)}</span>
             </div>
             <div className="info-row">
                 <span className="label">CIRCULATING:</span>
-                <span className="value">{formatNumber(data.market_data.circulating_supply)} BCH</span>
+                <span className="value">{formatNumber(data.circulating_supply)} BCH</span>
             </div>
             <div className="info-row">
-                <span className="label">24H HIGH:</span>
-                <span className="value">{formatCurrency(data.market_data.high_24h.usd)}</span>
+                <span className="label">MAX SUPPLY:</span>
+                <span className="value">{formatNumber(data.max_supply)} BCH</span>
             </div>
             <div className="info-row">
-                <span className="label">24H LOW:</span>
-                <span className="value">{formatCurrency(data.market_data.low_24h.usd)}</span>
+                <span className="label">ALL TIME HIGH:</span>
+                <span className="value">{formatCurrency(data.quotes.USD.ath_price)}</span>
             </div>
 
             <style>{`
