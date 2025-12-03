@@ -12,6 +12,7 @@ interface CoinData {
         }
     };
     circulating_supply: number;
+    total_supply: number;
     max_supply: number;
 }
 
@@ -62,7 +63,7 @@ const InfoPanel: React.FC = () => {
             </div>
             <div className="info-row">
                 <span className="label">CIRCULATING:</span>
-                <span className="value">{formatNumber(data.circulating_supply)} BCH</span>
+                <span className="value">{formatNumber(data.circulating_supply || data.total_supply)} BCH</span>
             </div>
             <div className="info-row">
                 <span className="label">MAX SUPPLY:</span>
