@@ -4,7 +4,7 @@ import Ticker from './components/Ticker';
 import Terminal from './components/Terminal';
 import HackerGif from './components/HackerGif';
 import BlockMonitor from './components/BlockMonitor';
-import { Shield, Activity, Database, Lock } from 'lucide-react';
+import { Shield, Activity, Database } from 'lucide-react';
 import hackerAnimation from './assets/hacker-animation.gif';
 
 import DigitalMarquee from './components/DigitalMarquee';
